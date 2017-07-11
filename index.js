@@ -1,3 +1,5 @@
+"use strict";
+
 function Container() {
     this.componentDescriptions = {};
     this.builders = {};
