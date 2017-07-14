@@ -1,4 +1,4 @@
-"use strict";
+'use strict';
 
 function Container() {
     this.componentDescriptions = {};
@@ -89,7 +89,7 @@ function ComponentBuilder() {
 
     this.build = function (container, componentDescription, identityMap) {
         var component = this.createComponent(this.buildDependencies(container, componentDescription.dependencies, identityMap));
-        if (identityMap)
+        if (identityMap && identityMap.hasOwnProperty(componentDescription.name))
             identityMap[componentDescription.name] = component;
         this.injectProperties(container, component, componentDescription.injectProperties, identityMap);
         return component;
