@@ -1,12 +1,30 @@
 'use strict';
 
+function ComponentNotFoundError(message) {
+    Error.call(this, message);
+}
+ComponentNotFoundError.prototype = Object.create(Error.prototype);
+ComponentNotFoundError.prototype.constructor = ComponentNotFoundError;
+
+function ConcreteNotSpecifiedError() {
+    Error.call(this);
+}
+ConcreteNotSpecifiedError.prototype = Object.create(Error.prototype);
+ConcreteNotSpecifiedError.prototype.constructor = ConcreteNotSpecifiedError;
+
+function InvalidContractError() {
+    Error.call(this);
+}
+InvalidContractError.prototype = Object.create(Error.prototype);
+InvalidContractError.prototype.constructor = InvalidContractError;
+
 function Container() {
     this.componentDescriptions = {};
     this.builders = {};
 
     this.bind = function (contract) {
         var name = this.getName(contract);
-        if (name === "") throw 'invalid contract';
+        if (name === "") throw new InvalidContractError();
         var componentDescription = new ComponentDescription(name);
         this.componentDescriptions[name] = componentDescription;
         return new ConcreteSpecification(componentDescription);
@@ -30,7 +48,7 @@ function Container() {
 
     this.getBuilder = function (name) {
         if (undefined === this.builders[name]) {
-            if (undefined === this.componentDescriptions[name]) throw 'component not found';
+            if (undefined === this.componentDescriptions[name]) throw new ComponentNotFoundError(name);
             this.builders[name] = this.componentDescriptions[name].builder;
         }
         return this.builders[name];
@@ -47,12 +65,12 @@ function Value(value) {
 
 function ConcreteSpecification(description) {
     this.to = function (concrete) {
-        if (undefined === concrete || null === concrete) throw 'concrete not defined';
+        if (undefined === concrete || null === concrete) throw new ConcreteNotSpecifiedError();
         if (typeof concrete === 'function') {
             if (concrete.name !== "") {
-                description.builder = new CtorBuilder(concrete);
+                description.builder = new ClassBuilder(concrete);
             } else {
-                description.builder = new FuncBuilder(concrete);
+                description.builder = new MethodBuilder(concrete);
             }
         } else {
             description.builder = new WrapperBuilder(concrete);
@@ -114,7 +132,7 @@ function ComponentBuilder() {
     }
 
     this.createComponent = function (dependencies) {
-        throw 'must be implemented in subclass';
+        return undefined;
     }
 }
 
@@ -125,9 +143,10 @@ function WrapperBuilder(instance) {
         return instance;
     }
 };
-WrapperBuilder.prototype = new ComponentBuilder();
+WrapperBuilder.prototype = Object.create(ComponentBuilder.prototype);
+WrapperBuilder.prototype.constructor = WrapperBuilder;
 
-function CtorBuilder(ctor) {
+function ClassBuilder(ctor) {
     ComponentBuilder.call(this);
 
     this.createComponent = function (dependencies) {
@@ -135,16 +154,18 @@ function CtorBuilder(ctor) {
         return new boundConstructor();
     }
 };
-CtorBuilder.prototype = new ComponentBuilder();
+ClassBuilder.prototype = Object.create(ComponentBuilder.prototype);
+ClassBuilder.prototype.constructor = ClassBuilder;
 
-function FuncBuilder(fn) {
+function MethodBuilder(fn) {
     ComponentBuilder.call(this);
 
     this.createComponent = function (dependencies) {
         return fn.apply(null, dependencies);
     }
 };
-FuncBuilder.prototype = new ComponentBuilder();
+MethodBuilder.prototype = Object.create(ComponentBuilder.prototype);
+MethodBuilder.prototype.constructor = MethodBuilder;
 
 function SingletonBuilder(inner) {
     ComponentBuilder.call(this);
@@ -157,7 +178,8 @@ function SingletonBuilder(inner) {
         return this.instance;
     }
 };
-SingletonBuilder.prototype = new ComponentBuilder();
+SingletonBuilder.prototype = Object.create(ComponentBuilder.prototype);
+SingletonBuilder.prototype.constructor = SingletonBuilder;
 
 var roboContainer = function (contract, identityMap) {
     return new roboContainer.fn.r(contract, identityMap);
