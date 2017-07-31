@@ -1,5 +1,29 @@
 # Robo-Container
 A Dependency Injection library for NodeJS
+
+## Table of Contents
+
+- [Installing](#installing)
+- [Getting Started](#getting-started)
+- [Contract](#contract)
+- [Bindings](#bindings)
+  - [Class Binding](#class-binding)
+  - [Method Binding](#method-binding)
+  - [Instance Binding](#instance-binding)
+- [Values](#values)
+- [Overwriting Bindings](#overwriting-bindings)
+  - [Permanent Overwriting](#permanent-overwriting)
+  - [Temporary Overwriting](#temporary-overwriting)
+  - [Instance Binding](#instance-binding)
+- [Injections](#injections)
+  - [Constructor Injection](#constructor-injection)
+  - [Property Injection](#property-injection)
+- [Component Life Cycle](#component-life-cycle)
+  - [Transient](#transient)
+  - [Singleton](#singleton)
+- [Common Problems](#common-problems)
+
+
 ## Installing ##
 
 Run following command to install:
