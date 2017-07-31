@@ -1,71 +1,52 @@
 'use strict';
 
-function ComponentNotFoundError(message) {
-    Error.call(this, message);
-}
-ComponentNotFoundError.prototype = Object.create(Error.prototype);
-ComponentNotFoundError.prototype.constructor = ComponentNotFoundError;
-
-function ConcreteNotSpecifiedError() {
-    Error.call(this);
-}
-ConcreteNotSpecifiedError.prototype = Object.create(Error.prototype);
-ConcreteNotSpecifiedError.prototype.constructor = ConcreteNotSpecifiedError;
-
-function InvalidContractError() {
-    Error.call(this);
-}
-InvalidContractError.prototype = Object.create(Error.prototype);
-InvalidContractError.prototype.constructor = InvalidContractError;
-
 function Container() {
-    this.componentDescriptions = {};
-    this.builders = {};
+    var descriptions = new Map();
+
+    var getName = function (contract) {
+        return typeof contract === 'function' ? contract.name : contract;
+    }
+
+    var getBuilder = function (name) {
+        if (!descriptions.has(name)) throw new Error(`Component [${name}] could not be found`);
+        return descriptions.get(name).builder;
+    };
 
     this.bind = function (contract) {
-        var name = this.getName(contract);
-        if (name === "") throw new InvalidContractError();
-        var componentDescription = new ComponentDescription(name);
-        this.componentDescriptions[name] = componentDescription;
-        return new ConcreteSpecification(componentDescription);
+        var name = getName(contract);
+        if (name === "") throw new Error('Invalid contract');
+        var description = {
+            name: name
+        };
+        descriptions.set(name, description);
+        return new ConcreteSpecification(description);
     };
 
     this.resolve = function (contract, identityMap) {
-        if (contract instanceof Value) {
+        if (contract instanceof ValueWrapper) {
             return contract.value;
         }
-        var name = this.getName(contract);
+        var name = getName(contract);
         if (identityMap) {
-            return undefined === identityMap[name] ? this.getBuilder(name).build(this, this.componentDescriptions[name], identityMap)
-                : identityMap[name]
+            return undefined === identityMap[name] ? getBuilder(name).build(this, descriptions.get(name), identityMap) :
+                identityMap[name]
+        } else {
+            return getBuilder(name).build(this, descriptions.get(name));
         }
-        return this.getBuilder(name).build(this, this.componentDescriptions[name]);
     };
 
     this.value = function (value) {
-        return new Value(value);
+        return new ValueWrapper(value);
     };
-
-    this.getBuilder = function (name) {
-        if (undefined === this.builders[name]) {
-            if (undefined === this.componentDescriptions[name]) throw new ComponentNotFoundError(name);
-            this.builders[name] = this.componentDescriptions[name].builder;
-        }
-        return this.builders[name];
-    };
-
-    this.getName = function (contract) {
-        return typeof contract === 'function' ? contract.name : contract;
-    }
 };
 
-function Value(value) {
+function ValueWrapper(value) {
     this.value = value;
 };
 
 function ConcreteSpecification(description) {
     this.to = function (concrete) {
-        if (undefined === concrete || null === concrete) throw new ConcreteNotSpecifiedError();
+        if (undefined === concrete || null === concrete) throw new Error(`No concrete specified for [${description.name}]`);
         if (typeof concrete === 'function') {
             if (concrete.name !== "") {
                 description.builder = new ClassBuilder(concrete);
@@ -96,24 +77,9 @@ function DependencySpecification(description) {
     }
 };
 
-function ComponentDescription(name) {
-    this.name = name;
-    this.builder = undefined;
-    this.dependencies = undefined;
-    this.injectProperties = undefined;
-};
-
 function ComponentBuilder() {
 
-    this.build = function (container, componentDescription, identityMap) {
-        var component = this.createComponent(this.buildDependencies(container, componentDescription.dependencies, identityMap));
-        if (identityMap && identityMap.hasOwnProperty(componentDescription.name))
-            identityMap[componentDescription.name] = component;
-        this.injectProperties(container, component, componentDescription.injectProperties, identityMap);
-        return component;
-    };
-
-    this.buildDependencies = function (container, dependencies, identityMap) {
+    var buildDependencies = function (container, dependencies, identityMap) {
         var resolved = [];
         if (undefined !== dependencies) {
             dependencies.forEach(function (dependency) {
@@ -123,23 +89,31 @@ function ComponentBuilder() {
         return resolved;
     };
 
-    this.injectProperties = function (container, component, properties, identityMap) {
+    var injectProperties = function (container, component, properties, identityMap) {
         if (undefined === properties) return;
         for (var property in properties) {
             if (properties.hasOwnProperty(property))
                 component[property] = container.resolve(properties[property], identityMap);
         };
-    }
+    };
+
+    this.build = function (container, description, identityMap) {
+        var component = this.createComponent(buildDependencies(container, description.dependencies, identityMap));
+        if (identityMap && identityMap.hasOwnProperty(description.name))
+            identityMap[description.name] = component;
+        injectProperties(container, component, description.injectProperties, identityMap);
+        return component;
+    };
 
     this.createComponent = function (dependencies) {
         return undefined;
-    }
+    };
 }
 
 function WrapperBuilder(instance) {
     ComponentBuilder.call(this);
 
-    this.build = function (container, componentDescription, identityMap) {
+    this.build = function (container, description, identityMap) {
         return instance;
     }
 };
@@ -171,9 +145,9 @@ function SingletonBuilder(inner) {
     ComponentBuilder.call(this);
     this.instance = undefined;
 
-    this.build = function (container, componentDescription, identityMap) {
+    this.build = function (container, description, identityMap) {
         if (undefined === this.instance) {
-            this.instance = inner.build(container, componentDescription, identityMap);
+            this.instance = inner.build(container, description, identityMap);
         }
         return this.instance;
     }
@@ -185,16 +159,16 @@ var roboContainer = function (contract, identityMap) {
     return new roboContainer.fn.r(contract, identityMap);
 };
 roboContainer.fn = roboContainer.prototype = new Container();
-roboContainer.bind = function(contract) {
+roboContainer.bind = function (contract) {
     return roboContainer.fn.bind(contract);
 };
-roboContainer.resolve = function(contract, identityMap) {
+roboContainer.resolve = function (contract, identityMap) {
     return roboContainer.fn.resolve(contract, identityMap);
 };
-roboContainer.value = function(value) {
+roboContainer.value = function (value) {
     return roboContainer.fn.value(value);
 }
-roboContainer.fn.r = function(contract, identityMap) {
+roboContainer.fn.r = function (contract, identityMap) {
     if (!contract) return this;
     return roboContainer.resolve(contract, identityMap);
 };
