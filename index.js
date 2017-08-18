@@ -156,7 +156,7 @@ SingletonBuilder.prototype = Object.create(ComponentBuilder.prototype);
 SingletonBuilder.prototype.constructor = SingletonBuilder;
 
 var roboContainer = function (contract, identityMap) {
-    return new roboContainer.fn.r(contract, identityMap);
+    return roboContainer.fn.r(contract, identityMap);
 };
 roboContainer.fn = roboContainer.prototype = new Container();
 roboContainer.bind = function (contract) {
